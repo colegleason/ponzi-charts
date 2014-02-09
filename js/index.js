@@ -5,13 +5,22 @@ var ponziData, changeData, txs;
 
 function loadData(cb) {
     d3.json('data/ponzi.json', function(data) {
-        d3.json('data/ponzi.json', function(change) {
+        d3.json('data/ponzi_change.json', function(change) {
             ponziData = data;
             changeData = change;
             txs = data.txs.concat(change.txs);
             var tx_hash = _.indexBy(txs, 'tx_index');
             txs = _.values(tx_hash);
             txs.sort(function(a, b) { return a.time - b.time;});
+            txs.forEach(function(t) {
+                t.total_input = t.inputs.reduce(function(sum, input) {
+                    return sum + input.prev_out.value;
+                }, 0);
+                t.total_output = t.out.reduce(function(sum, output) {
+                    return sum + output.value;
+                }, 0);
+                t.tx_fee = t.total_input = t.total_output;
+            });
             if (cb) cb(txs);
         });
     });
@@ -56,38 +65,41 @@ function inOut(id, data) {
             .scale(y)
             .orient("left");
 
+    var satoshiPerBTC =  100000000;
     var line = d3.svg.line()
             .x(function(d) { return x(d.date); })
             .y(function(d) {
-                return y(d.value_sum);
+                return y(d.value_sum / satoshiPerBTC);
             });
-
-    var satoshiPerBTC =  100000000;
-    incoming_txs.forEach(function(d, i, array) {
-        d.date = new Date(d.time*1000);
-        var out_sum = d.out.reduce(function(sum, out) {
-            // if the out address is ponzi, count it
-            var is_ponzi = out.addr == PONZI_ADDR;
-            return sum + (is_ponzi ? out.value : 0);
-        }, 0) / satoshiPerBTC;
-        d.value_sum = i == 0? out_sum : array[i - 1].value_sum + out_sum;
+    var inData = [];
+    incoming_txs.forEach(function(tx) {
+        var datum = {};
+        datum.date = new Date(tx.time*1000);
+        var to_ponzi = tx.out.reduce(function(sum, output) {
+            var is_ponzi = (output.addr === PONZI_ADDR);
+            return sum + (is_ponzi ? output.value : 0);
+        }, 0);
+        var last = _.last(inData);
+        datum.value_sum = to_ponzi + (last ? last.value_sum : 0);
+        inData.push(datum);
     });
 
-    outgoing_txs.forEach(function(d, i, array) {
-        d.date = new Date(d.time*1000);
-        var out_sum = d.out.reduce(function(sum, out) {
+    var outData = [];
+    outgoing_txs.forEach(function(tx) {
+        var datum = {};
+        datum.date = new Date(tx.time*1000);
+        var from_ponzi = tx.out.reduce(function(sum, output) {
             // if the out address is going to ponzi or change, ignore it
-            var is_ponzi = out.addr == PONZI_ADDR || out.addr == CHANGE_ADDR;
-            return sum + (is_ponzi ? 0 : out.value);
-        }, 0) / satoshiPerBTC;
-        d.value_sum = i == 0? out_sum : array[i - 1].value_sum + out_sum;
+            var is_ponzi = output.addr == PONZI_ADDR || output.addr == CHANGE_ADDR;
+            return sum + (is_ponzi ? 0 : output.value);
+        }, 0);
+        var last = _.last(outData);
+        datum.value_sum = from_ponzi + (last ? last.value_sum : 0);
+        outData.push(datum);
     });
 
-    console.log('in total: ' + incoming_txs[incoming_txs.length - 1].value_sum);
-    console.log('out_total: ' + outgoing_txs[outgoing_txs.length - 1].value_sum);
-
-    x.domain(d3.extent(incoming_txs.concat(outgoing_txs), function(d) { return d.date; }));
-    y.domain(d3.extent(incoming_txs.concat(outgoing_txs), function(d) { return d.value_sum; }));
+    x.domain(d3.extent(outData.concat(inData), function(d) { return d.date; }));
+    y.domain(d3.extent(outData.concat(inData), function(d) { return d.value_sum / satoshiPerBTC; }));
 
     svg.append("g")
         .attr("class", "x axis")
@@ -105,12 +117,12 @@ function inOut(id, data) {
         .text("Amount (BTC)");
 
     svg.append("path")
-        .datum(incoming_txs)
+        .datum(inData)
         .attr("class", "line_in")
         .attr("d", line);
 
     svg.append("path")
-        .datum(outgoing_txs)
+        .datum(outData)
         .attr("class", "line_out")
         .attr("d", line);
 }
