@@ -10,4 +10,24 @@ body {
     margin:auto;
 }
 
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
 
+.x.axis path {
+  display: none;
+}
+
+.line_in {
+  fill: none;
+  stroke: steelblue;
+  stroke-width: 1.5px;
+}
+.line_out {
+  fill: none;
+  stroke: red;
+  stroke-width: 1.5px;
+}
