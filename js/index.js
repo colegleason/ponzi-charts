@@ -1,28 +1,34 @@
 var PONZI_ADDR = "1ponziUjuCVdB167ZmTWH48AURW1vE64q";
 var CHANGE_ADDR = "14ji9KmegNHhTchf4ftkt3J1ywmijGjd6M";
 
-function main() {
+var ponziData, changeData, txs;
+
+function loadData(cb) {
     d3.json('data/ponzi.json', function(data) {
-        d3.json('data/ponzi.json', function(data_change) {
-            incoming("#main", data, data_change);
+        d3.json('data/ponzi.json', function(change) {
+            ponziData = data;
+            changeData = change;
+            txs = data.txs.concat(change.txs);
+            var tx_hash = _.indexBy(txs, 'tx_index');
+            txs = _.values(tx_hash);
+            txs.sort(function(a, b) { return a.time - b.time;});
+            if (cb) cb(txs);
         });
     });
 }
 
-function incoming(id, data, data_change) {
-    var txs = data.txs.concat(data_change.txs);
-    var tx_hash = _.indexBy(txs, 'tx_index');
-    txs = _.values(tx_hash);
-    txs.sort(function(a, b) { return a.time - b.time;});
+function inOut(id, data) {
+    data = data || txs;
+    d3.select('#chart-description').text('Sum of incoming/outgoing transactions over time.');
 
-    var incoming_txs = txs.filter(function(t) {
+    var incoming_txs = data.filter(function(t) {
         var out_addrs = _.pluck(t.out, 'addr');
         return _.contains(out_addrs, PONZI_ADDR);
     });
 
-    var outgoing_txs = txs.filter(function(t) {
+    var outgoing_txs = data.filter(function(t) {
         var input_addrs = _.pluck(_.pluck(t.inputs, 'prev_out'), 'addr');
-        return _.contains(input_addrs, PONZI_ADDR) || _.contains(input_addrs, CHANGE_ADDR);
+        return _.contains(input_addrs, PONZI_ADDR) || _.contains(input_addrs, CHANGE_ADDR) ;
     });
 
     var margin = {top: 20, right: 20, bottom: 30, left: 50},
@@ -30,7 +36,7 @@ function incoming(id, data, data_change) {
         height = 500 - margin.top - margin.bottom;
 
     // Insert a new SVG element (our chart)
-    var svg = d3.select(id).append("svg")
+    var svg = d3.select(id + ' svg')
             .attr("width", width + margin.left + margin.right)
             .attr("height", height + margin.top + margin.bottom)
             .append("g")
@@ -77,26 +83,26 @@ function incoming(id, data, data_change) {
         d.value_sum = i == 0? out_sum : array[i - 1].value_sum + out_sum;
     });
 
-    console.log(incoming_txs[incoming_txs.length - 1].value_sum);
-    console.log(outgoing_txs[outgoing_txs.length - 1].value_sum);
+    console.log('in total: ' + incoming_txs[incoming_txs.length - 1].value_sum);
+    console.log('out_total: ' + outgoing_txs[outgoing_txs.length - 1].value_sum);
 
-  x.domain(d3.extent(incoming_txs.concat(outgoing_txs), function(d) { return d.date; }));
-  y.domain(d3.extent(incoming_txs.concat(outgoing_txs), function(d) { return d.value_sum; }));
+    x.domain(d3.extent(incoming_txs.concat(outgoing_txs), function(d) { return d.date; }));
+    y.domain(d3.extent(incoming_txs.concat(outgoing_txs), function(d) { return d.value_sum; }));
 
-  svg.append("g")
-      .attr("class", "x axis")
-      .attr("transform", "translate(0," + height + ")")
-      .call(xAxis);
+    svg.append("g")
+        .attr("class", "x axis")
+        .attr("transform", "translate(0," + height + ")")
+        .call(xAxis);
 
-  svg.append("g")
-      .attr("class", "y axis")
-      .call(yAxis)
-    .append("text")
-      .attr("transform", "rotate(-90)")
-      .attr("y", 6)
-      .attr("dy", ".71em")
-      .style("text-anchor", "end")
-      .text("Amount (BTC)");
+    svg.append("g")
+        .attr("class", "y axis")
+        .call(yAxis)
+        .append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 6)
+        .attr("dy", ".71em")
+        .style("text-anchor", "end")
+        .text("Amount (BTC)");
 
     svg.append("path")
         .datum(incoming_txs)

@@ -25,7 +25,7 @@
         </div>
         <div class="collapse navbar-collapse">
           <ul class="nav navbar-nav">
-            <li class="active"><a href="#">Home</a></li>
+            <li class="active"><a href="javascript:void(0)" onclick="inOut('#main')">In/Out</a></li>
           </ul>
         </div><!--/.nav-collapse -->
       </div>
@@ -35,9 +35,10 @@
     <div class="container" id="content">
       <div class="greeting">
         <h1>charts from the ponzi.io experiment</h1>
-        <p class="lead">Here is the sum of inputs/outputs over time.</p>
+        <p class="lead" id="chart-description"></p>
       </div>
       <div id="main">
+        <svg></svg>
       </div>
       <hr />
       <div class="row">
@@ -73,7 +74,9 @@
     <!-- Your Javascript code should go here. -->
     <script type="text/javascript" src="js/index.js"></script>
     <script type="text/javascript">
-      main();
+      loadData(function(txs) {
+      inOut('#main', txs);
+      });
     </script>
       <script type="text/javascript">
         /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
